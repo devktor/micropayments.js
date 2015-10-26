@@ -1,0 +1,34 @@
+{
+  "name": "micropayments.js",
+  "preferGlobal": false,
+  "version": "0.1.1",
+  "author": "Victor Bucataru <ping@devktor.com>",
+  "description": "Bitcoin micropayments channel node.js library",
+  "contributors": [ 
+    {
+      "name": "Victor Bucataru",
+      "email": "ping@devktor.com"
+    } 
+  ],
+  "dependencies" : {
+    "coffee-script": "*",
+    "bitcoinjs-lib": "*"
+  },
+  "license": "MIT",
+  "repository":{
+    "type":"git",
+    "url":"https://github.com/devktor/micropayments.js"
+  },
+  "bugs":{
+    "url": "https://github.com/devktor/micropayments.js/issues"
+  },
+  "scripts": {
+    "install": "coffee  -o lib -c src/"
+  },
+  "keywords": ["bitcoin", "micropayments"],
+  "main": "lib/main.js",
+  "engines": {
+    "node": "*"
+  }
+}
+
