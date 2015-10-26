@@ -1,0 +1,171 @@
+<html>
+<head>
+    <style>
+        .channel{
+            margin: 10px;
+            border: 1px solid #cecece;
+            padding:10px;
+        }
+        .channel .info{
+            width:400px;
+            color: #bababa;
+            float: left;
+            margin-left:20px;
+        }
+        .channel .qr{
+            width: 125px;
+            height: 125px;
+            float: left;
+        }
+        .channel .info span{
+            color:black;
+        }
+        .controls{
+            clear:both;
+            margin-top:10px;
+            padding-top: 10px;
+        }
+        button{
+            -webkit-appearance: none;
+            padding:5px;
+        }
+        .main-controls {
+            margin: 10px;
+            padding: 20px 0;
+        }
+        .main-controls button{
+            padding: 15px;
+        }
+    </style>
+</head>
+<body>
+<div class="main-controls">
+    <button name="create">create</button>
+</div>
+<div class="channel-list">
+<div class="channel">
+    <div class="qr"></div>
+    <div class="info">
+        <div>Contract : <span></span></div>
+        <div>Contract TxID : <span></span></div>
+        <div>Status : <span>open</span></div>
+        <div>Deposit Amount  : <span>10</span></div>
+        <div>Contract Amount : <span>10</span></div>
+        <div>Deposit Address : <span>asdasd</span></div>
+        <div>Payment TxID : <span></span></div>
+        <div>Refund TxID : <span></span></div>
+    </div>
+    <div class="controls">
+        <button name="close" >close</button> <button name="pay">pay</button>
+    </div>
+</div>
+</div>
+</body>
+<script type="text/javascript" src="/jquery.min.js"></script>
+<script type="text/javascript" src="/jquery.qrcode.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script type="text/javascript">
+    function getStatusText(item){
+        return '<span style="color:'+(!item.active?'red">closed':item.contractID!=undefined?'green">open':'#aeaeae">pending')+'</span>';
+    }
+    function pay(channel, amount, callback){
+        $.ajax({url:"/pay",type:"post",dataType:"json",data:{channel:channel, amount:amount},success:function(data){
+            callback(null, data);
+        },error:function(err){
+            callback(err);
+        }});
+    }
+    function drawChannel(list, item){
+        var el = $('<div id="'+item.id+'" class="channel"><div class="qr"></div><div class="info"> <div>Contract : <span>'+item.id+'</span></div> <div id="contractID">Contract TxID : <span>'+item.contractID+'</span></div> <div id="status">Status : <span>'+getStatusText(item)+'</span></div> <div id="depositAmount">Deposit Amount  : <span>'+item.depositAmount+'</span></div> <div id="contractAmount">Contract Amount : <span>'+item.contractAmount+'</span></div> <div>Deposit Address : <span>'+item.depositAddress+'</span></div> <div id="paymentID">Payment TxID : <span></span></div> <div class="refundTxID">Refund TxID : <span></span></div> </div> <div class="controls"> <button id="close" >close</button> <button id="pay">pay</button> </div></div>');
+        list.append(el);
+        el.find(".qr").qrcode({
+            left: 0,
+            top: 0,
+            size: 125,
+            text: item.depositAddress
+        });
+        var payButton = el.find("#pay");
+        var timer;
+        var resumePayment = function(){
+            timer = setInterval(function(){
+                pay(item.id, 10, function(err, data){
+
+                    if(err){
+                        clearInterval(timer);
+                        alert("failed to pay: ",err);
+                    }else{
+                        var el = $("#"+item.id);
+                        el.find("#contractAmount span").html(data.contractAmount);
+                        el.find("#paymentID span").html(data.paymentID);
+                        if(data.contractAmount<10){
+                            clearInterval(timer);
+                            payButton.attr("disabled","disabled");
+                        }
+                    }
+                })
+            },1000);
+            payButton.html("pause");
+            payButton.unbind().click(function(){
+                clearInterval(timer);
+                payButton.unbind().click(resumePayment);
+                payButton.html("pay");
+            })
+
+        };
+        payButton.unbind().click(resumePayment);
+        var closeButton = el.find("#close")
+        closeButton.click(function(){
+            if(timer) clearInterval(timer);
+            payButton.attr("disabled","disabled");
+            closeButton.attr("disabled","disabled");
+            el.find("#status").html("<span style='color:red'>close</span>");
+            $.ajax({url:"/close",type:"post",dataType:"json",data:{channel:item.id},success:function(data){
+                var el = $("#"+item.id);
+                el.find("#paymentID span").html(data.paymentID);
+            },error:function(err){
+//                alert("failed to close the channel: "+err)
+            }})
+        })
+        if(!item.active){
+            payButton.attr("disabled","disabled");
+            closeButton.attr("disabled","disabled");
+        }
+    }
+    function updateChannel(data){
+        var el = $("#"+data.id);
+        el.find("#status>span").html(getStatusText(data));
+        el.find("#contractAmount span").html(data.contractAmount);
+        el.find("#depositAmount span").html(data.depositAmount);
+        el.find("#contractID span").html(data.contractID);
+    }
+    function loadChannels(){
+        $.ajax({url:"/list",success:function(data){
+            console.log("got result : ",data);
+            var list = $(".channel-list");
+            list.html("");
+            for(var i in data){
+                drawChannel(list, data[i]);
+            }
+        },error:function(){
+            alert("failed to load channels");
+        }})
+    }
+    function openChannel(){
+        $.ajax({url:"/open",success:function(data){
+            console.log("open: ",data);
+            drawChannel($(".channel-list"), data);
+        }, error:function(){
+            alert("error");
+        }})
+    }
+
+
+    $(document).ready(function(){
+        loadChannels();
+        $("[name=create]").click(openChannel);
+        console.log("io=",io)
+        var socket = io();
+        socket.on('update', updateChannel);
+    })
+</script>
+</html>
